@@ -3,16 +3,11 @@ import { existsSync } from "node:fs";
 import type { FastifyInstance } from "fastify";
 import type { AppConfig } from "../config.js";
 import type { JobStore } from "../ingest/jobStore.js";
-import { startIngestJob } from "../ingest/runJob.js";
-
-interface RepoLike {
-  deleteByFileName: (file: string) => Promise<void>;
-  insertRows: (rows: unknown[]) => Promise<void>;
-}
+import { startIngestJob, type IngestJobRepo } from "../ingest/runJob.js";
 
 interface Deps {
   cfg: Pick<AppConfig, "CARGAS_DIR" | "INGEST_BATCH_SIZE">;
-  repo: RepoLike;
+  repo: IngestJobRepo;
   jobs: JobStore;
 }
 
