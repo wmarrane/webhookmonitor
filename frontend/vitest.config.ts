@@ -11,6 +11,6 @@ export default defineConfig({
     testTimeout: 15000,
     // Deterministic single-process run avoids jsdom/worker contention flakiness
     pool: "forks",
-    poolOptions: { forks: { singleFork: true } },
+    singleFork: true,
   },
 });
