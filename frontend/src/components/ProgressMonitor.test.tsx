@@ -15,6 +15,11 @@ describe("ProgressMonitor", () => {
     expect(screen.getByText(/50%/)).toBeInTheDocument();
   });
 
+  it("upload with total 0 shows 0% (no division by zero)", () => {
+    render(<ProgressMonitor phase="upload" upload={{ loaded: 0, total: 0 }} job={null} />);
+    expect(screen.getByText(/0%/)).toBeInTheDocument();
+  });
+
   it("ingest phase shows live counters and NO percentage", () => {
     render(<ProgressMonitor phase="ingest" upload={null} job={job()} />);
     expect(screen.getByText(/1200/)).toBeInTheDocument();

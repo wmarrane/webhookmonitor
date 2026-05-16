@@ -19,7 +19,7 @@ export function ProgressMonitor(props: {
     return (
       <div className="rounded bg-white p-4 shadow text-sm space-y-2">
         <p className="font-semibold">Enviando arquivo… {pct}%</p>
-        <div className="h-3 w-full overflow-hidden rounded bg-slate-200">
+        <div className="h-3 w-full overflow-hidden rounded bg-slate-200" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
           <div className="h-3 bg-blue-600 transition-all" style={{ width: `${pct}%` }} />
         </div>
         <p className="text-slate-500">
@@ -42,7 +42,7 @@ export function ProgressMonitor(props: {
       <p className="font-semibold">
         {done ? "Ingestão concluída" : failed ? "Ingestão falhou" : "Ingestão em andamento…"}
       </p>
-      <div className="h-3 w-full overflow-hidden rounded bg-slate-200">
+      <div className="h-3 w-full overflow-hidden rounded bg-slate-200" role="progressbar" aria-label="progresso da ingestão">
         <div
           className={
             "h-3 " +
