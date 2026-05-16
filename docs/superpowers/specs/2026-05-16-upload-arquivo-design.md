@@ -1,14 +1,19 @@
-# Upload de Arquivo do Navegador → ClickHouse — Design
+# Upload de Arquivo do Navegador + Monitor Visual de Ingestão — Design
 
 Data: 2026-05-16
 
 ## 1. Objetivo
 
-Permitir que o usuário **selecione um arquivo CSV do próprio computador** na
-tela de Importação e o envie ao servidor para ser ingerido no ClickHouse,
-reutilizando o pipeline de ingestão existente. Hoje a importação só lista
-arquivos já presentes em `/cargas` (lado servidor); esta feature adiciona o
-envio a partir da máquina do usuário.
+Duas capacidades nesta entrega:
+
+1. Permitir que o usuário **selecione um arquivo CSV do próprio computador**
+   na tela de Importação e o envie ao servidor para ser ingerido no
+   ClickHouse, reutilizando o pipeline de ingestão existente. Hoje a
+   importação só lista arquivos já presentes em `/cargas` (lado servidor);
+   esta feature adiciona o envio a partir da máquina do usuário.
+2. Um **monitor visual de progresso** na tela de Importação para acompanhar o
+   upload e a ingestão (barra + métricas ao vivo). Uma página dedicada de
+   "Monitoramento" fica para uma etapa futura (fora de escopo aqui).
 
 ## 2. Restrições e contexto
 
@@ -68,12 +73,37 @@ existente).
 
 - `src/api/client.ts`: adicionar `uploadFile(file: File, onProgress)` usando
   `XMLHttpRequest` (necessário para evento de progresso de upload), `POST`
-  multipart para `${BASE}/api/upload`, resolvendo `{ jobId }`.
+  multipart para `${BASE}/api/upload`, resolvendo `{ jobId }`. `onProgress`
+  recebe `{ loaded, total }` do evento `xhr.upload.onprogress`.
 - `src/pages/Import.tsx`: nova seção "Enviar arquivo do meu computador" com
-  `<input type="file" accept=".csv">` + botão **Enviar**. Mostra barra de
-  progresso do **upload** (0–100%); ao receber `jobId`, reaproveita o painel
-  de job existente (polling de `importStatus`) para a fase de ingestão.
-  Estados de erro/loading reutilizam o padrão atual (`setError`).
+  `<input type="file" accept=".csv">` + botão **Enviar**. Mostra o **monitor
+  visual de progresso** (ver abaixo) cobrindo as duas fases. Estados de
+  erro/loading reutilizam o padrão atual (`setError`).
+
+### Monitor visual de progresso (nesta entrega)
+
+Componente `src/components/ProgressMonitor.tsx`, exibido na tela de Importação
+durante upload **e** durante a ingestão (vale tanto para upload do navegador
+quanto para a importação de arquivo já em `/cargas`).
+
+- **Fase 1 — Upload** (somente para envio do navegador): barra **determinada**
+  com `%` real = `loaded/total`, mais bytes enviados/total (MB) e velocidade
+  (MB/s) calculada no cliente a partir de amostras de tempo.
+- **Fase 2 — Ingestão**: como o total de linhas do CSV é desconhecido (leitura
+  em streaming), a barra é **indeterminada/animada** (não exibe `%` falso),
+  acompanhada de contadores **ao vivo** vindos do `JobStore` via polling de
+  `GET /api/import/:id`: linhas processadas, inseridas, erros, **status**,
+  **tempo decorrido** (a partir de `job.startedAt`) e **velocidade**
+  (linhas/s = `rowsProcessed` / tempo decorrido, suavizada).
+- Estados terminais: `done` → barra cheia/verde + resumo (total inserido,
+  erros, duração); `failed` → vermelho + `job.error`.
+- Sem mudança de backend: o `JobStore`/`ImportJob` já fornece
+  `rowsProcessed/rowsInserted/parseErrors/status/error/startedAt/finishedAt`;
+  o componente apenas deriva tempo/velocidade no cliente. Polling reaproveita
+  o intervalo já existente do `Import.tsx` (1s), com limpeza em unmount/erro
+  (hardening já aplicado).
+- O painel textual atual de job é substituído por este componente (mesma
+  informação, agora visual); nada de telas novas.
 
 ### Infra
 
@@ -109,11 +139,23 @@ O job de ingestão segue a semântica já existente (parse vs insert errors,
     `UPLOAD_DIR`).
 - **Frontend** (`frontend/src/pages/Import.test.tsx` — caso novo OU teste do
   cliente): seleção de arquivo + envio mockando `XMLHttpRequest`/`fetch`,
-  verifica progresso de upload e transição para o painel de job (`done`).
+  verifica progresso de upload e transição para a fase de ingestão (`done`).
+- **Frontend** (`frontend/src/components/ProgressMonitor.test.tsx`): fase
+  upload mostra `%` determinado a partir de `{loaded,total}`; fase ingestão
+  mostra barra indeterminada + contadores (processadas/inseridas/erros) e
+  estado terminal `done`/`failed` corretamente (props mockadas, sem `%` falso
+  na ingestão).
 - Suíte completa permanece verde (backend + frontend) e build limpo.
 
 ## 6. Fora de escopo (YAGNI)
 
+- **Página dedicada de "Monitoramento"** (lista de jobs em andamento/recentes
+  com histórico) — adiada para uma próxima etapa por decisão do usuário; esta
+  entrega faz apenas a barra/monitor na tela de Importação.
+- Progresso de ingestão em **tempo real via SSE/WebSocket** — mantém-se o
+  polling de 1s já existente.
+- Percentual de ingestão baseado em total de linhas (exigiria pré-scan do
+  arquivo gigante) — usa-se barra indeterminada + contadores.
 - Upload chunked/resumável (tus/uppy).
 - Parsear o stream do upload direto no ClickHouse sem persistir em disco.
 - Múltiplos arquivos por requisição.
