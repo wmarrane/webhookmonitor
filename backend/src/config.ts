@@ -9,6 +9,8 @@ const schema = z.object({
   CARGAS_DIR: z.string().min(1).default("/cargas"),
   INGEST_BATCH_SIZE: z.coerce.number().int().positive().default(50000),
   LOG_LEVEL: z.string().default("info"),
+  UPLOAD_DIR: z.string().min(1).default("/uploads"),
+  MAX_UPLOAD_BYTES: z.coerce.number().int().nonnegative().default(0),
 });
 
 export type AppConfig = z.infer<typeof schema>;
