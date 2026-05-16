@@ -14,13 +14,33 @@ export function Import() {
   }, []);
 
   const start = async (file: string) => {
+    if (timer.current) {
+      clearInterval(timer.current);
+      timer.current = null;
+    }
     setJob(null);
-    const { jobId } = await api.startImport(file);
-    timer.current = setInterval(async () => {
-      const j = await api.importStatus(jobId);
-      setJob(j);
-      if (j.status !== "running" && timer.current) clearInterval(timer.current);
-    }, 1000);
+    setError(null);
+    try {
+      const { jobId } = await api.startImport(file);
+      timer.current = setInterval(async () => {
+        try {
+          const j = await api.importStatus(jobId);
+          setJob(j);
+          if (j.status !== "running" && timer.current) {
+            clearInterval(timer.current);
+            timer.current = null;
+          }
+        } catch (e) {
+          if (timer.current) {
+            clearInterval(timer.current);
+            timer.current = null;
+          }
+          setError(e instanceof Error ? e.message : String(e));
+        }
+      }, 1000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
   };
 
   return (

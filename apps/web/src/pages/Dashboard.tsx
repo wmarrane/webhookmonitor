@@ -40,8 +40,8 @@ export function Dashboard() {
             <div className="rounded bg-white p-4 shadow">
               <h2 className="mb-2 font-semibold">Por tipo de script</h2>
               <ul className="text-sm">
-                {stats.byScript.map((s) => (
-                  <li key={s.tipo_script} className="flex justify-between border-b py-1">
+                {stats.byScript.map((s, i) => (
+                  <li key={`${s.tipo_script}-${i}`} className="flex justify-between border-b py-1">
                     <span>{s.tipo_script || "(vazio)"}</span><span>{s.total}</span>
                   </li>
                 ))}
@@ -50,8 +50,8 @@ export function Dashboard() {
             <div className="rounded bg-white p-4 shadow">
               <h2 className="mb-2 font-semibold">Por título</h2>
               <ul className="text-sm">
-                {stats.byTitulo.map((s) => (
-                  <li key={s.titulo} className="flex justify-between border-b py-1">
+                {stats.byTitulo.map((s, i) => (
+                  <li key={`${s.titulo}-${i}`} className="flex justify-between border-b py-1">
                     <span>{s.titulo || "(vazio)"}</span><span>{s.total}</span>
                   </li>
                 ))}

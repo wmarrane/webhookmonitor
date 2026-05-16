@@ -37,7 +37,7 @@ export function Requests() {
         ))}
         <button
           className="rounded bg-slate-900 px-3 py-1 text-sm text-white"
-          onClick={() => { setPage(1); load(); }}
+          onClick={() => setPage(1)}
         >
           Filtrar
         </button>
@@ -66,7 +66,7 @@ export function Requests() {
                       <button
                         className="text-blue-700 underline"
                         onClick={() =>
-                          api.request(r.id_interno).then(setDetail).catch(() => {})
+                          api.request(r.id_interno).then(setDetail).catch((e: Error) => setError(e.message))
                         }
                       >
                         {r.id_interno}
