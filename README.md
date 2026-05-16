@@ -4,8 +4,8 @@ Stack standalone (separada do R2P) para monitorar requests de integração do
 NetSuite a partir de CSVs em `./cargas`.
 
 ## Componentes
-- `apps/api` — Fastify + ingestão streaming + ClickHouse client (porta 8091)
-- `apps/web` — React 19 + Vite + Tailwind 4 (porta 8090, Nginx)
+- `backend` — Fastify + ingestão streaming + ClickHouse client (porta 8091)
+- `frontend` — React 19 + Vite + Tailwind 4 (porta 8090, Nginx)
 - ClickHouse: **externo, já existente** em 192.168.56.127 (não provisionado aqui)
 
 ## Rodar
@@ -25,7 +25,7 @@ NetSuite a partir de CSVs em `./cargas`.
   `status` é gravado como `unknown`.
 - Reimportar o mesmo arquivo substitui os dados daquele arquivo (`source_file`).
 - `VITE_API_BASE_URL` é **build-time** e obrigatório: deve apontar para a URL
-  do `apps/api` acessível pelo navegador (ex.: `http://192.168.56.113:8091`).
+  do `backend` acessível pelo navegador (ex.: `http://192.168.56.113:8091`).
   Se vazio, o front faz chamadas same-origin (`:8090`) e a API não responde.
   Alterá-lo exige rebuild da imagem web (`docker compose up -d --build`).
 - O ClickHouse em 192.168.56.127 deve aceitar o usuário/senha do `.env`.

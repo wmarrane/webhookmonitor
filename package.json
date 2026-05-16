@@ -2,11 +2,11 @@
   "name": "webhook-monitor",
   "version": "1.0.0",
   "private": true,
-  "workspaces": ["apps/api", "apps/web"],
+  "workspaces": ["backend", "frontend"],
   "scripts": {
-    "dev:api": "npm run dev --workspace apps/api",
-    "dev:web": "npm run dev --workspace apps/web",
-    "test": "npm run test --workspace apps/api && npm run test --workspace apps/web",
-    "build": "npm run build --workspace apps/api && npm run build --workspace apps/web"
+    "dev:api": "npm run dev --workspace backend",
+    "dev:web": "npm run dev --workspace frontend",
+    "test": "npm run test --workspace backend && npm run test --workspace frontend",
+    "build": "npm run build --workspace backend && npm run build --workspace frontend"
   }
 }

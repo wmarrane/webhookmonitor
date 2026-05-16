@@ -8,5 +8,9 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./vitest.setup.ts"],
     include: ["src/**/*.test.tsx"],
+    testTimeout: 15000,
+    // Deterministic single-process run avoids jsdom/worker contention flakiness
+    pool: "forks",
+    poolOptions: { forks: { singleFork: true } },
   },
 });

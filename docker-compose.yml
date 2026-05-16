@@ -3,7 +3,7 @@ services:
   monitor-api:
     build:
       context: .
-      dockerfile: apps/api/Dockerfile
+      dockerfile: backend/Dockerfile
     container_name: monitor-api
     restart: unless-stopped
     environment:
@@ -29,7 +29,7 @@ services:
   monitor-web:
     build:
       context: .
-      dockerfile: apps/web/Dockerfile
+      dockerfile: frontend/Dockerfile
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL}
     container_name: monitor-web

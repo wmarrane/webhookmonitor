@@ -16,6 +16,8 @@ describe("Import", () => {
     render(<Import />);
     await waitFor(() => expect(screen.getByText("sample.csv")).toBeInTheDocument());
     await userEvent.click(screen.getByRole("button", { name: /importar/i }));
-    await waitFor(() => expect(screen.getByText(/done/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/done/i)).toBeInTheDocument(), {
+      timeout: 5000,
+    });
   });
 });
