@@ -1,10 +1,9 @@
 import { basename, join } from "node:path";
 import { existsSync } from "node:fs";
-import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { AppConfig } from "../config.js";
 import type { JobStore } from "../ingest/jobStore.js";
-import { ingestCsv } from "../ingest/ingestService.js";
+import { startIngestJob } from "../ingest/runJob.js";
 
 interface RepoLike {
   deleteByFileName: (file: string) => Promise<void>;
@@ -36,38 +35,13 @@ export function registerImport(app: FastifyInstance, deps: Deps): void {
     const job = deps.jobs.create(safe);
     reply.code(202).send({ jobId: job.id });
 
-    void (async () => {
-      try {
-        await deps.repo.deleteByFileName(safe);
-        let firstInsertError: string | null = null;
-        const result = await ingestCsv({
-          filePath: full,
-          ingestBatch: randomUUID(),
-          batchSize: deps.cfg.INGEST_BATCH_SIZE,
-          insert: async (rows) => {
-            await deps.repo.insertRows(rows);
-          },
-          onProgress: (p) => deps.jobs.update(job.id, p),
-          onError: (err) => {
-            if (firstInsertError === null) {
-              firstInsertError = err instanceof Error ? err.message : String(err);
-            }
-          },
-        });
-        deps.jobs.update(job.id, result);
-        if (result.rowsInserted === 0 && result.rowsProcessed > 0) {
-          deps.jobs.finish(job.id, "failed", firstInsertError ?? "no rows were inserted");
-        } else {
-          deps.jobs.finish(job.id, "done");
-        }
-      } catch (err) {
-        deps.jobs.finish(
-          job.id,
-          "failed",
-          err instanceof Error ? err.message : String(err),
-        );
-      }
-    })();
+    startIngestJob({
+      jobs: deps.jobs,
+      jobId: job.id,
+      repo: deps.repo,
+      filePath: full,
+      batchSize: deps.cfg.INGEST_BATCH_SIZE,
+    });
   });
 
   app.get<{ Params: { id: string } }>("/api/import/:id", async (req, reply) => {
