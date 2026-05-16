@@ -15,10 +15,10 @@ export async function initSchema(
   client: ClickHouseClient,
   db: string,
 ): Promise<void> {
-  await client.command({ query: `CREATE DATABASE IF NOT EXISTS ${db}` });
+  await client.command({ query: `CREATE DATABASE IF NOT EXISTS \`${db}\`` });
   await client.command({
     query: `
-      CREATE TABLE IF NOT EXISTS ${db}.requests (
+      CREATE TABLE IF NOT EXISTS \`${db}\`.requests (
         id_interno    UInt64,
         event_ts      DateTime,
         nome          LowCardinality(String),
