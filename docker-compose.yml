@@ -15,10 +15,13 @@ services:
       CARGAS_DIR: /cargas
       INGEST_BATCH_SIZE: ${INGEST_BATCH_SIZE}
       LOG_LEVEL: ${LOG_LEVEL}
+      UPLOAD_DIR: /uploads
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES}
     ports:
       - "8091:8091"
     volumes:
       - ./cargas:/cargas:ro
+      - ./uploads:/uploads
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8091/api/health"]
       interval: 15s

@@ -25,3 +25,7 @@ dist/
 # IDE / OS artifacts
 .DS_Store
 .idea/
+
+# Uploaded files
+uploads/*
+!uploads/.gitkeep
