@@ -1,0 +1,34 @@
+# Standalone monitor stack — separate from R2P. Dedicated high ports.
+services:
+  monitor-api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: monitor-api
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_URL: ${CLICKHOUSE_URL}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB}
+      API_PORT: 8091
+      CARGAS_DIR: /cargas
+      INGEST_BATCH_SIZE: ${INGEST_BATCH_SIZE}
+      LOG_LEVEL: ${LOG_LEVEL}
+    ports:
+      - "8091:8091"
+    volumes:
+      - ./cargas:/cargas:ro
+
+  monitor-web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+    container_name: monitor-web
+    restart: unless-stopped
+    depends_on:
+      - monitor-api
+    ports:
+      - "8090:80"
