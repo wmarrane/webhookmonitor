@@ -11,8 +11,8 @@ export function registerRequests(app: FastifyInstance, repo: RequestsRepo): void
       titulo: q.titulo || undefined,
       status: q.status || undefined,
       q: q.q || undefined,
-      page: Math.max(1, Number(q.page) || 1),
-      pageSize: Math.min(200, Math.max(1, Number(q.pageSize) || 25)),
+      page: Math.max(1, Math.trunc(Number(q.page)) || 1),
+      pageSize: Math.min(200, Math.max(1, Math.trunc(Number(q.pageSize)) || 25)),
     });
   });
 

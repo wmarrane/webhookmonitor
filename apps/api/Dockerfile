@@ -14,6 +14,7 @@ COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
 RUN npm ci --workspace apps/api --omit=dev --include-workspace-root
 COPY --from=build /app/apps/api/dist ./apps/api/dist
+USER node
 WORKDIR /app/apps/api
 EXPOSE 8091
 CMD ["node", "dist/index.js"]

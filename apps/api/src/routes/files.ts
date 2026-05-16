@@ -7,8 +7,18 @@ export function registerFiles(
   app: FastifyInstance,
   cfg: Pick<AppConfig, "CARGAS_DIR">,
 ): void {
-  app.get("/api/files", async () => {
-    const entries = await readdir(cfg.CARGAS_DIR);
+  app.get("/api/files", async (_req, reply) => {
+    let entries: string[];
+    try {
+      entries = await readdir(cfg.CARGAS_DIR);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+        return reply
+          .code(503)
+          .send({ error: "cargas_unavailable", message: "cargas directory not found" });
+      }
+      throw err;
+    }
     const csvs = entries.filter((e) => e.toLowerCase().endsWith(".csv"));
     const out = [];
     for (const name of csvs) {

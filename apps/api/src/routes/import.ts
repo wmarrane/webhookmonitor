@@ -39,6 +39,7 @@ export function registerImport(app: FastifyInstance, deps: Deps): void {
     void (async () => {
       try {
         await deps.repo.deleteByFileName(safe);
+        let firstInsertError: string | null = null;
         const result = await ingestCsv({
           filePath: full,
           ingestBatch: randomUUID(),
@@ -47,9 +48,18 @@ export function registerImport(app: FastifyInstance, deps: Deps): void {
             await deps.repo.insertRows(rows);
           },
           onProgress: (p) => deps.jobs.update(job.id, p),
+          onError: (err) => {
+            if (firstInsertError === null) {
+              firstInsertError = err instanceof Error ? err.message : String(err);
+            }
+          },
         });
         deps.jobs.update(job.id, result);
-        deps.jobs.finish(job.id, "done");
+        if (result.rowsInserted === 0 && result.rowsProcessed > 0) {
+          deps.jobs.finish(job.id, "failed", firstInsertError ?? "no rows were inserted");
+        } else {
+          deps.jobs.finish(job.id, "done");
+        }
       } catch (err) {
         deps.jobs.finish(
           job.id,
