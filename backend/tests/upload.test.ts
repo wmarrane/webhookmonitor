@@ -1,0 +1,104 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtempSync, rmSync, readdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import Fastify from "fastify";
+import multipart from "@fastify/multipart";
+import FormData from "form-data";
+import { registerUpload } from "../src/routes/upload.js";
+import { JobStore } from "../src/ingest/jobStore.js";
+
+let dir: string;
+beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "uploads-")); });
+afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+function fakeRepo() {
+  const inserted: unknown[] = [];
+  return { inserted, deleteByFileName: async () => {}, insertRows: async (r: unknown[]) => { inserted.push(...r); } };
+}
+
+const CSV =
+  "ID interno,Data,Hora,Nome,Título,Tipo,Tipo de script,Detalhes\n" +
+  '3262308,15/05/2026,1:06,[CCC] MSG,nr,Depurar,Evento de usuário,"{""id"":""360738"",""type"":""invoice"",""fields"":{""custbody_nst_integra_id_"":""38967664""}}"\n';
+
+async function build(maxBytes = 0) {
+  const app = Fastify();
+  await app.register(multipart);
+  const jobs = new JobStore();
+  const repo = fakeRepo();
+  registerUpload(app, {
+    cfg: { UPLOAD_DIR: dir, INGEST_BATCH_SIZE: 100, MAX_UPLOAD_BYTES: maxBytes } as never,
+    repo: repo as never,
+    jobs,
+  });
+  return { app, jobs, repo };
+}
+
+function form(filename: string, content: string) {
+  const f = new FormData();
+  f.append("file", Buffer.from(content), { filename, contentType: "text/csv" });
+  return f;
+}
+
+describe("POST /api/upload", () => {
+  it("streams a CSV to UPLOAD_DIR and ingests it (job done)", async () => {
+    const { app, jobs, repo } = await build();
+    const f = form("dados.csv", CSV);
+    const res = await app.inject({ method: "POST", url: "/api/upload", payload: f, headers: f.getHeaders() });
+    expect(res.statusCode).toBe(202);
+    const { jobId } = res.json() as { jobId: string };
+    expect(jobId).toMatch(/^[0-9a-f-]{36}$/);
+
+    let st = "";
+    for (let i = 0; i < 50; i++) {
+      const r = await app.inject({ method: "GET", url: `/api/import/${jobId}` });
+      st = (r.json() as { status: string }).status;
+      if (st !== "running") break;
+      await new Promise((x) => setTimeout(x, 20));
+    }
+    const job = jobs.get(jobId)!;
+    expect(["done", "failed"]).toContain(job.status);
+    expect(job.status).toBe("done");
+    expect(repo.inserted.length).toBe(1);
+    expect(readdirSync(dir).length).toBe(1);
+    await app.close();
+  });
+
+  it("rejects non-csv with 400", async () => {
+    const { app } = await build();
+    const f = form("nota.txt", "x");
+    const res = await app.inject({ method: "POST", url: "/api/upload", payload: f, headers: f.getHeaders() });
+    expect(res.statusCode).toBe(400);
+    await app.close();
+  });
+
+  it("rejects when no file part is present", async () => {
+    const { app } = await build();
+    const f = new FormData();
+    f.append("notafile", "x");
+    const res = await app.inject({ method: "POST", url: "/api/upload", payload: f, headers: f.getHeaders() });
+    expect(res.statusCode).toBe(400);
+    await app.close();
+  });
+
+  it("enforces MAX_UPLOAD_BYTES and removes the partial file (413)", async () => {
+    const { app } = await build(8);
+    const f = form("grande.csv", CSV);
+    const res = await app.inject({ method: "POST", url: "/api/upload", payload: f, headers: f.getHeaders() });
+    expect(res.statusCode).toBe(413);
+    expect(readdirSync(dir).length).toBe(0);
+    await app.close();
+  });
+
+  it("sanitizes path-traversal filenames (stays inside UPLOAD_DIR)", async () => {
+    const { app } = await build();
+    const f = form("../../evil.csv", CSV);
+    const res = await app.inject({ method: "POST", url: "/api/upload", payload: f, headers: f.getHeaders() });
+    expect(res.statusCode).toBe(202);
+    const names = readdirSync(dir);
+    expect(names.length).toBe(1);
+    expect(names[0].includes("..")).toBe(false);
+    expect(names[0].endsWith(".csv")).toBe(true);
+    await app.close();
+  });
+});

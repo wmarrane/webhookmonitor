@@ -1,0 +1,73 @@
+import { basename, extname, join } from "node:path";
+import { createWriteStream } from "node:fs";
+import { unlink } from "node:fs/promises";
+import { pipeline } from "node:stream/promises";
+import type { FastifyInstance } from "fastify";
+import "@fastify/multipart"; // loads the FastifyRequest module augmentation (req.file)
+import type { AppConfig } from "../config.js";
+import type { JobStore } from "../ingest/jobStore.js";
+import { startIngestJob, type IngestJobRepo } from "../ingest/runJob.js";
+
+interface Deps {
+  cfg: Pick<AppConfig, "UPLOAD_DIR" | "INGEST_BATCH_SIZE" | "MAX_UPLOAD_BYTES">;
+  repo: IngestJobRepo;
+  jobs: JobStore;
+}
+
+export function registerUpload(
+  app: FastifyInstance,
+  deps: Deps,
+  opts: { statusRoute?: boolean } = {},
+): void {
+  app.post("/api/upload", async (req, reply) => {
+    const limits =
+      deps.cfg.MAX_UPLOAD_BYTES > 0
+        ? { limits: { fileSize: deps.cfg.MAX_UPLOAD_BYTES } }
+        : {};
+    const part = await req.file({ ...limits, throwFileSizeLimit: false });
+
+    if (!part || !part.filename) {
+      return reply.code(400).send({ error: "bad_request", message: "no file part" });
+    }
+    const original = basename(part.filename);
+    if (!original.toLowerCase().endsWith(".csv")) {
+      part.file.resume();
+      return reply.code(400).send({ error: "bad_request", message: "only .csv files are accepted" });
+    }
+
+    const stem = basename(original, extname(original)).replace(/[^A-Za-z0-9._-]/g, "_");
+    const unique = `${stem}-${Date.now()}.csv`;
+    const dest = join(deps.cfg.UPLOAD_DIR, unique);
+
+    try {
+      await pipeline(part.file, createWriteStream(dest));
+    } catch (err) {
+      await unlink(dest).catch(() => {});
+      throw err;
+    }
+
+    if (part.file.truncated) {
+      await unlink(dest).catch(() => {});
+      return reply.code(413).send({ error: "too_large", message: "file exceeds MAX_UPLOAD_BYTES" });
+    }
+
+    const job = deps.jobs.create(unique);
+    reply.code(202).send({ jobId: job.id });
+
+    startIngestJob({
+      jobs: deps.jobs,
+      jobId: job.id,
+      repo: deps.repo,
+      filePath: dest,
+      batchSize: deps.cfg.INGEST_BATCH_SIZE,
+    });
+  });
+
+  if (opts.statusRoute !== false) {
+    app.get<{ Params: { id: string } }>("/api/import/:id", async (req, reply) => {
+      const job = deps.jobs.get(req.params.id);
+      if (!job) return reply.code(404).send({ error: "not_found", message: "job not found" });
+      return job;
+    });
+  }
+}
