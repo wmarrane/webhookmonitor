@@ -36,4 +36,20 @@ describe("Import", () => {
     expect(upSpy).toHaveBeenCalled();
     await waitFor(() => expect(screen.getByText(/Ingest[aã]o conclu/i)).toBeInTheDocument(), { timeout: 5000 });
   });
+
+  it("upload failure resets to idle and surfaces the error", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(api, "uploadFile").mockRejectedValue(new Error("network fail"));
+
+    render(<Import />);
+    await waitFor(() => expect(screen.getByLabelText(/arquivo do meu computador/i)).toBeInTheDocument());
+    const input = screen.getByLabelText(/arquivo do meu computador/i) as HTMLInputElement;
+    await userEvent.upload(input, new File(["a\n"], "u.csv", { type: "text/csv" }));
+    await userEvent.click(screen.getByRole("button", { name: /enviar/i }));
+
+    await waitFor(() => expect(screen.getByText(/network fail/i)).toBeInTheDocument());
+    expect(screen.queryByText(/Ingest[aã]o/i)).toBeNull();
+  });
 });
