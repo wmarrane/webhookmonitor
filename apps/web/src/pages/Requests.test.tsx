@@ -17,16 +17,21 @@ const listResponse = {
 };
 
 describe("Requests", () => {
-  it("loads and displays rows; opens drill-down", async () => {
+  it("loads rows, links txn_id to the transaction trace, and opens the JSON drill-down from id_interno", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify(listResponse), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ id_interno: 3262308, detalhes: "{\"id\":\"360738\"}" }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
     render(<MemoryRouter><Requests /></MemoryRouter>);
-    await waitFor(() => expect(screen.getByText("360738")).toBeInTheDocument());
 
-    await userEvent.click(screen.getByText("360738"));
+    // row loaded: txn_id rendered as a navigation link
+    await waitFor(() => expect(screen.getByText("360738")).toBeInTheDocument());
+    const txnLink = screen.getByRole("link", { name: "360738" });
+    expect(txnLink).toHaveAttribute("href", "/transactions/360738");
+
+    // drill-down opens from the id_interno button, shows formatted payload
+    await userEvent.click(screen.getByRole("button", { name: "3262308" }));
     await waitFor(() =>
       expect(screen.getByText(/"id": "360738"/)).toBeInTheDocument(),
     );

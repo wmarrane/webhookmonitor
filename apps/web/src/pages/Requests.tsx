@@ -77,23 +77,12 @@ export function Requests() {
                     <td className="p-2">{r.tipo}</td>
                     <td className="p-2">
                       {r.txn_id ? (
-                        <span className="flex items-center gap-1">
-                          <button
-                            className="text-blue-700 underline"
-                            onClick={() =>
-                              api.request(r.id_interno).then(setDetail).catch(() => {})
-                            }
-                          >
-                            {r.txn_id}
-                          </button>
-                          <Link
-                            className="text-xs text-slate-500 underline"
-                            to={`/transactions/${r.txn_id}`}
-                            aria-label={`Abrir transação ${r.txn_id}`}
-                          >
-                            ↗
-                          </Link>
-                        </span>
+                        <Link
+                          className="text-blue-700 underline"
+                          to={`/transactions/${r.txn_id}`}
+                        >
+                          {r.txn_id}
+                        </Link>
                       ) : "—"}
                     </td>
                     <td className="p-2">{r.integra_id || "—"}</td>
