@@ -9,3 +9,19 @@ yarn-error.log*
 .pnp.js
 
 .vscode/*
+
+# Large data files — never commit
+cargas/*.csv
+!cargas/.gitkeep
+
+# Node
+node_modules/
+dist/
+.env
+*.log
+
+# Build
+apps/*/dist/
+
+# Worktrees
+.claude/worktrees/
