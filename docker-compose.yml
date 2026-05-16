@@ -19,6 +19,12 @@ services:
       - "8091:8091"
     volumes:
       - ./cargas:/cargas:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8091/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   monitor-web:
     build:
@@ -29,6 +35,7 @@ services:
     container_name: monitor-web
     restart: unless-stopped
     depends_on:
-      - monitor-api
+      monitor-api:
+        condition: service_healthy
     ports:
       - "8090:80"
