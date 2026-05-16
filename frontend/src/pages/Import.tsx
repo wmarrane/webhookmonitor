@@ -69,7 +69,7 @@ export function Import() {
         />
         <button
           className="rounded bg-slate-900 px-3 py-1 text-white disabled:opacity-40"
-          disabled={!picked}
+          disabled={!picked || phase !== "idle"}
           onClick={sendUpload}
         >
           Enviar
