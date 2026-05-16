@@ -1,0 +1,4 @@
+ID interno,Data,Hora,Nome,Título,Tipo,Tipo de script,Detalhes
+3262308,15/05/2026,1:06,[CCC] MSG Transaction UE,nr,Depurar,Evento de usuário,"{""id"":""360738"",""type"":""invoice"",""fields"":{""custbody_nst_integra_id_"":""38967664""}}"
+3266039,15/05/2026,1:08,[CCC] MSG Transaction UE,pymtChargeback,Depurar,Evento de usuário,
+3246224,15/05/2026,0:25,[CCC] MSG Transaction UE,nr,Depurar,Evento de usuário,"{""id"":""3341422"",""type"":""invoice"",""fields"":{""custbody_nst_integra_id_"":""40573109""}}"
