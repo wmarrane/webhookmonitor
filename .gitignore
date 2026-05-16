@@ -17,6 +17,7 @@ node_modules/
 dist/
 .env
 *.log
+*.tsbuildinfo
 
 # Worktrees
 .claude/worktrees/
