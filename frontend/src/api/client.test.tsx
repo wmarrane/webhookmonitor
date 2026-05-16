@@ -21,4 +21,28 @@ describe("api client", () => {
     );
     await expect(api.files()).rejects.toThrow();
   });
+
+  it("uploadFile posts multipart and resolves jobId, reporting progress", async () => {
+    const listeners: Record<string, (e: unknown) => void> = {};
+    const xhrMock = {
+      upload: { addEventListener: (k: string, cb: (e: unknown) => void) => { listeners["up_" + k] = cb; } },
+      addEventListener: (k: string, cb: (e: unknown) => void) => { listeners[k] = cb; },
+      open: vi.fn(),
+      send: vi.fn(function (this: unknown) {
+        listeners["up_progress"]({ lengthComputable: true, loaded: 5, total: 10 });
+        Object.assign(xhrMock, { status: 202, responseText: JSON.stringify({ jobId: "job-9" }) });
+        listeners["load"]({});
+      }),
+      setRequestHeader: vi.fn(),
+      status: 0,
+      responseText: "",
+    };
+    vi.stubGlobal("XMLHttpRequest", function () { return xhrMock; } as unknown);
+
+    const seen: number[] = [];
+    const file = new File([new Uint8Array(10)], "x.csv", { type: "text/csv" });
+    const jobId = await api.uploadFile(file, (p) => seen.push(p.loaded / p.total));
+    expect(jobId).toBe("job-9");
+    expect(seen).toContain(0.5);
+  });
 });

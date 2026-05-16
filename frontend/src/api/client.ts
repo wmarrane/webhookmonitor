@@ -37,6 +37,36 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return (await res.json()) as T;
 }
 
+export interface UploadProgress { loaded: number; total: number; }
+
+function uploadFile(
+  file: File,
+  onProgress?: (p: UploadProgress) => void,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${BASE}/api/upload`);
+    xhr.upload.addEventListener("progress", (e: ProgressEvent) => {
+      if (e.lengthComputable && onProgress) onProgress({ loaded: e.loaded, total: e.total });
+    });
+    xhr.addEventListener("load", () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve((JSON.parse(xhr.responseText) as { jobId: string }).jobId);
+        } catch {
+          reject(new Error("invalid upload response"));
+        }
+      } else {
+        reject(new Error(`API ${xhr.status}: /api/upload`));
+      }
+    });
+    xhr.addEventListener("error", () => reject(new Error("upload network error")));
+    const form = new FormData();
+    form.append("file", file, file.name);
+    xhr.send(form);
+  });
+}
+
 export const api = {
   health: () => get<{ status: string; clickhouse: boolean }>("/api/health"),
   files: () => get<FileInfo[]>("/api/files"),
@@ -46,4 +76,5 @@ export const api = {
   requests: (qs = "") => get<ListResult>(`/api/requests${qs}`),
   request: (id: number) => get<Record<string, unknown>>(`/api/requests/${id}`),
   transaction: (txn: string) => get<RequestSummary[]>(`/api/transactions/${encodeURIComponent(txn)}`),
+  uploadFile,
 };
