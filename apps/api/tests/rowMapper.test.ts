@@ -18,7 +18,7 @@ const rec = {
 
 describe("mapRow", () => {
   it("maps a full record into a RequestRow", () => {
-    const row = mapRow(rec, "batch-1", "2026-05-16 10:00:00");
+    const row = mapRow(rec, "batch-1", "2026-05-16 10:00:00", "sample.csv");
     expect(row.id_interno).toBe(3262308);
     expect(row.event_ts).toBe("2026-05-15 01:06:00");
     expect(row.nome).toBe("[CCC] MSG Transaction UE");
@@ -31,6 +31,7 @@ describe("mapRow", () => {
     expect(row.status).toBe("unknown");
     expect(row.ingest_batch).toBe("batch-1");
     expect(row.ingested_at).toBe("2026-05-16 10:00:00");
+    expect(row.source_file).toBe("sample.csv");
   });
 
   it("handles empty Detalhes (e.g. pymtChargeback rows)", () => {
@@ -38,6 +39,7 @@ describe("mapRow", () => {
       { ...rec, "Título": "pymtChargeback", Detalhes: "" },
       "b",
       "2026-05-16 10:00:00",
+      "sample.csv",
     );
     expect(row.detalhes).toBe("");
     expect(row.txn_id).toBe("");
@@ -45,7 +47,12 @@ describe("mapRow", () => {
   });
 
   it("defaults id_interno to 0 when not numeric", () => {
-    const row = mapRow({ ...rec, "ID interno": "" }, "b", "2026-05-16 10:00:00");
+    const row = mapRow(
+      { ...rec, "ID interno": "" },
+      "b",
+      "2026-05-16 10:00:00",
+      "sample.csv",
+    );
     expect(row.id_interno).toBe(0);
   });
 });

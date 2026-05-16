@@ -12,6 +12,7 @@ export interface RequestRow {
   status: string;          // 'unknown' for now
   ingest_batch: string;    // UUID
   ingested_at: string;     // "YYYY-MM-DD HH:MM:SS"
+  source_file: string;     // basename of the ingested CSV
 }
 
 export interface ImportJob {

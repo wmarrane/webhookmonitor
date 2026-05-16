@@ -1,4 +1,5 @@
 import { createReadStream } from "node:fs";
+import { basename } from "node:path";
 import { parse } from "csv-parse";
 import { mapRow, type CsvRecord } from "../csv/rowMapper.js";
 import type { RequestRow } from "../types.js";
@@ -57,7 +58,9 @@ export async function ingestCsv(opts: IngestOptions): Promise<IngestResult> {
   for await (const record of parser as AsyncIterable<CsvRecord>) {
     rowsProcessed += 1;
     try {
-      batch.push(mapRow(record, opts.ingestBatch, ingestedAt));
+      batch.push(
+        mapRow(record, opts.ingestBatch, ingestedAt, basename(opts.filePath)),
+      );
     } catch {
       parseErrors += 1;
       continue;

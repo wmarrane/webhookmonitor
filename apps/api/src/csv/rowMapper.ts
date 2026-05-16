@@ -8,6 +8,7 @@ export function mapRow(
   rec: CsvRecord,
   ingestBatch: string,
   ingestedAt: string,
+  sourceFile: string,
 ): RequestRow {
   const detalhes = rec["Detalhes"] ?? "";
   const f = extractFields(detalhes);
@@ -26,5 +27,6 @@ export function mapRow(
     status: "unknown",
     ingest_batch: ingestBatch,
     ingested_at: ingestedAt,
+    source_file: sourceFile,
   };
 }

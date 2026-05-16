@@ -27,6 +27,7 @@ describe("ingestCsv", () => {
     const all = batches.flat();
     expect(all[0].txn_id).toBe("360738");
     expect(all[0].integra_id).toBe("38967664");
+    expect(all[0].source_file).toBe("sample.csv");
     expect(all[1].titulo).toBe("pymtChargeback");
     expect(all[1].detalhes).toBe("");
     expect(all[1].txn_id).toBe("");

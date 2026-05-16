@@ -31,7 +31,8 @@ export async function initSchema(
         integra_id    String,
         status        LowCardinality(String),
         ingest_batch  UUID,
-        ingested_at   DateTime
+        ingested_at   DateTime,
+        source_file   String
       )
       ENGINE = MergeTree
       PARTITION BY toYYYYMM(event_ts)
