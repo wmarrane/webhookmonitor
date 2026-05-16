@@ -8,6 +8,10 @@ import FormData from "form-data";
 import { registerUpload } from "../src/routes/upload.js";
 import { JobStore } from "../src/ingest/jobStore.js";
 
+// Note: client-abort mid-upload is handled in upload.ts (pipeline rejects →
+// unlink(dest) removes the partial file) but is not exercised here because
+// app.inject() has no real socket to abort. Covered by code inspection.
+
 let dir: string;
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "uploads-")); });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));

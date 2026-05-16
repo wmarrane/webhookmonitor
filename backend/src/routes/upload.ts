@@ -2,6 +2,7 @@ import { basename, extname, join } from "node:path";
 import { createWriteStream } from "node:fs";
 import { unlink } from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
+import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import "@fastify/multipart"; // loads the FastifyRequest module augmentation (req.file)
 import type { AppConfig } from "../config.js";
@@ -36,7 +37,7 @@ export function registerUpload(
     }
 
     const stem = basename(original, extname(original)).replace(/[^A-Za-z0-9._-]/g, "_");
-    const unique = `${stem}-${Date.now()}.csv`;
+    const unique = `${stem}-${Date.now()}-${randomBytes(4).toString("hex")}.csv`;
     const dest = join(deps.cfg.UPLOAD_DIR, unique);
 
     try {
@@ -63,6 +64,10 @@ export function registerUpload(
     });
   });
 
+  // GET /api/import/:id is also provided by registerImport. In production
+  // (index.ts) registerUpload is called with { statusRoute: false } to avoid
+  // duplicate route registration; statusRoute defaults true so the upload
+  // route is self-contained when used in isolation (e.g. tests).
   if (opts.statusRoute !== false) {
     app.get<{ Params: { id: string } }>("/api/import/:id", async (req, reply) => {
       const job = deps.jobs.get(req.params.id);
