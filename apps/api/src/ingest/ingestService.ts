@@ -2,6 +2,7 @@ import { createReadStream } from "node:fs";
 import { parse } from "csv-parse";
 import { mapRow, type CsvRecord } from "../csv/rowMapper.js";
 import type { RequestRow } from "../types.js";
+import { now } from "../time.js";
 
 export interface IngestOptions {
   filePath: string;
@@ -13,16 +14,13 @@ export interface IngestOptions {
     rowsInserted: number;
     parseErrors: number;
   }) => void;
+  onError?: (err: unknown, batchSize: number) => void;
 }
 
 export interface IngestResult {
   rowsProcessed: number;
   rowsInserted: number;
   parseErrors: number;
-}
-
-function now(): string {
-  return new Date().toISOString().slice(0, 19).replace("T", " ");
 }
 
 export async function ingestCsv(opts: IngestOptions): Promise<IngestResult> {
@@ -39,8 +37,9 @@ export async function ingestCsv(opts: IngestOptions): Promise<IngestResult> {
     try {
       await opts.insert(toInsert);
       rowsInserted += toInsert.length;
-    } catch {
+    } catch (err) {
       parseErrors += toInsert.length;
+      opts.onError?.(err, toInsert.length);
     }
     opts.onProgress?.({ rowsProcessed, rowsInserted, parseErrors });
   };

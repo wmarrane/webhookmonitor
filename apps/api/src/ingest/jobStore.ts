@@ -1,9 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { ImportJob } from "../types.js";
+import { now } from "../time.js";
 
-function now(): string {
-  return new Date().toISOString().slice(0, 19).replace("T", " ");
-}
+export type JobProgress = Pick<ImportJob, "rowsProcessed" | "rowsInserted" | "parseErrors">;
 
 export class JobStore {
   private jobs = new Map<string, ImportJob>();
@@ -25,10 +24,11 @@ export class JobStore {
   }
 
   get(id: string): ImportJob | undefined {
-    return this.jobs.get(id);
+    const job = this.jobs.get(id);
+    return job ? { ...job } : undefined;
   }
 
-  update(id: string, patch: Partial<ImportJob>): void {
+  update(id: string, patch: JobProgress): void {
     const job = this.jobs.get(id);
     if (job) Object.assign(job, patch);
   }
