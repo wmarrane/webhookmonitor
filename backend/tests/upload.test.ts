@@ -129,6 +129,29 @@ describe("POST /api/upload", () => {
     expect(res.statusCode).toBe(202);
     for (let i = 0; i < 50; i++) { if (repo.inserted.length >= 1) break; await new Promise((x) => setTimeout(x, 20)); }
     expect((repo.inserted[0] as { source_file: string }).source_file).toBe("dados.csv");
+    expect(readdirSync(dir).length).toBe(1);
+    await app.close();
+  });
+
+  it("removes temp file and 500s if fileStats throws (no orphan)", async () => {
+    const app = Fastify();
+    await app.register(multipart);
+    const jobs = new JobStore();
+    const repo = {
+      inserted: [] as unknown[],
+      deleteByFileName: async () => {},
+      insertRows: async () => {},
+      fileStats: async () => { throw new Error("clickhouse down"); },
+    };
+    registerUpload(app, {
+      cfg: { UPLOAD_DIR: dir, INGEST_BATCH_SIZE: 100, MAX_UPLOAD_BYTES: 0 } as never,
+      repo: repo as never,
+      jobs,
+    });
+    const f = form("dados.csv", CSV);
+    const res = await app.inject({ method: "POST", url: "/api/upload", payload: f, headers: f.getHeaders() });
+    expect(res.statusCode).toBe(500);
+    expect(readdirSync(dir).length).toBe(0);
     await app.close();
   });
 

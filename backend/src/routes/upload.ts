@@ -54,14 +54,20 @@ export function registerUpload(
 
     const replace = req.query.replace === "1";
     if (!replace) {
-      const { rows, lastIngestedAt } = await deps.repo.fileStats(original);
-      if (rows > 0) {
+      let stats: { rows: number; lastIngestedAt: string };
+      try {
+        stats = await deps.repo.fileStats(original);
+      } catch (err) {
+        await unlink(dest).catch(() => {});
+        throw err;
+      }
+      if (stats.rows > 0) {
         await unlink(dest).catch(() => {});
         return reply.code(409).send({
           error: "already_imported",
-          message: `file already imported (${rows} rows)`,
-          rows,
-          lastIngestedAt,
+          message: `file already imported (${stats.rows} rows)`,
+          rows: stats.rows,
+          lastIngestedAt: stats.lastIngestedAt,
         });
       }
     }
