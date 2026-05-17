@@ -9,6 +9,7 @@ import { registerRequests } from "./routes/requests.js";
 import { registerTransactions } from "./routes/transactions.js";
 import multipart from "@fastify/multipart";
 import { registerUpload } from "./routes/upload.js";
+import { registerImportsExists } from "./routes/imports.js";
 
 const cfg = loadConfig();
 const ch = makeClickHouse(cfg);
@@ -25,6 +26,7 @@ const app = buildServer({
     a.register(multipart);
     registerFiles(a, cfg);
     registerImport(a, { cfg, repo, jobs });
+    registerImportsExists(a, { repo });
     registerRequests(a, repo);
     registerTransactions(a, repo);
     registerUpload(a, { cfg, repo, jobs }, { statusRoute: false });
