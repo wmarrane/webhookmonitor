@@ -35,6 +35,7 @@ export function registerImport(app: FastifyInstance, deps: Deps): void {
       jobId: job.id,
       repo: deps.repo,
       filePath: full,
+      sourceName: safe,
       batchSize: deps.cfg.INGEST_BATCH_SIZE,
     });
   });

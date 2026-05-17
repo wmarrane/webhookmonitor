@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { basename } from "node:path";
 import { ingestCsv } from "./ingestService.js";
 import type { JobStore } from "./jobStore.js";
 
@@ -13,23 +12,20 @@ export interface StartIngestJobOptions {
   jobId: string;
   repo: IngestJobRepo;
   filePath: string;
+  sourceName: string;
   batchSize: number;
 }
 
-/**
- * Fire-and-forget: roda o ingest de filePath e atualiza o job.
- * source_file no ClickHouse é basename(filePath) (igual ao ingestCsv),
- * então deleteByFileName usa o mesmo basename para o "replace por arquivo".
- */
+/** Fire-and-forget: ingere filePath, grava source_file = sourceName, e deleteByFileName(sourceName) faz o "replace por arquivo". */
 export function startIngestJob(opts: StartIngestJobOptions): void {
-  const sourceName = basename(opts.filePath);
   void (async () => {
     try {
-      await opts.repo.deleteByFileName(sourceName);
+      await opts.repo.deleteByFileName(opts.sourceName);
       let firstInsertError: string | null = null;
       const result = await ingestCsv({
         filePath: opts.filePath,
         ingestBatch: randomUUID(),
+        sourceName: opts.sourceName,
         batchSize: opts.batchSize,
         insert: async (rows) => {
           await opts.repo.insertRows(rows);

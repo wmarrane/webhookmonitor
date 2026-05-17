@@ -13,6 +13,7 @@ describe("ingestCsv", () => {
     const res = await ingestCsv({
       filePath: sample,
       ingestBatch: "batch-xyz",
+      sourceName: "sample.csv",
       batchSize: 2,
       insert: async (rows) => {
         batches.push(rows.map((r) => ({ ...r })));
@@ -39,6 +40,7 @@ describe("ingestCsv", () => {
     const res = await ingestCsv({
       filePath: sample,
       ingestBatch: "b",
+      sourceName: "sample.csv",
       batchSize: 1,
       insert: async () => {
         calls += 1;
@@ -48,5 +50,18 @@ describe("ingestCsv", () => {
     expect(res.rowsProcessed).toBe(3);
     expect(res.rowsInserted).toBe(2);
     expect(res.parseErrors).toBe(1);
+  });
+
+  it("uses sourceName for source_file, independent of filePath basename", async () => {
+    const batches: RequestRow[][] = [];
+    const res = await ingestCsv({
+      filePath: sample,
+      ingestBatch: "b",
+      sourceName: "ORIGINAL.csv",
+      batchSize: 10,
+      insert: async (rows) => { batches.push(rows.map((r) => ({ ...r }))); },
+    });
+    expect(res.rowsInserted).toBeGreaterThan(0);
+    expect(batches.flat()[0].source_file).toBe("ORIGINAL.csv");
   });
 });

@@ -60,6 +60,7 @@ export function registerUpload(
       jobId: job.id,
       repo: deps.repo,
       filePath: dest,
+      sourceName: original,
       batchSize: deps.cfg.INGEST_BATCH_SIZE,
     });
   });
