@@ -7,49 +7,49 @@ import { api } from "../api/client.js";
 afterEach(() => vi.restoreAllMocks());
 
 describe("Import", () => {
-  it("lists files, starts import, shows ProgressMonitor until done", async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify([{ name: "sample.csv", size: 10, modified: "2026-05-16T00:00:00Z" }]), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ jobId: "job-1" }), { status: 202 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "job-1", file: "sample.csv", status: "done", rowsProcessed: 3, rowsInserted: 3, parseErrors: 0, error: null, startedAt: "2026-05-16 10:00:00", finishedAt: "2026-05-16 10:00:01" }), { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
+  it("server file: not imported -> imports directly and shows ProgressMonitor done", async () => {
+    vi.spyOn(api, "files").mockResolvedValue([{ name: "sample.csv", size: 10, modified: "2026-05-16T00:00:00Z" }]);
+    vi.spyOn(api, "importExists").mockResolvedValue({ exists: false, rows: 0, lastIngestedAt: "" });
+    const startSpy = vi.spyOn(api, "startImport").mockResolvedValue({ jobId: "job-1" });
+    vi.spyOn(api, "importStatus").mockResolvedValue({ id: "job-1", file: "sample.csv", status: "done", rowsProcessed: 3, rowsInserted: 3, parseErrors: 0, error: null, startedAt: "2026-05-16 10:00:00", finishedAt: "2026-05-16 10:00:01" });
 
     render(<Import />);
     await waitFor(() => expect(screen.getByText("sample.csv")).toBeInTheDocument());
     await userEvent.click(screen.getByRole("button", { name: /importar/i }));
     await waitFor(() => expect(screen.getByText(/Ingest[aã]o conclu/i)).toBeInTheDocument(), { timeout: 5000 });
+    expect(startSpy).toHaveBeenCalledWith("sample.csv", false);
   });
 
-  it("uploads a chosen file then tracks ingestion", async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "job-7", file: "u.csv", status: "done", rowsProcessed: 2, rowsInserted: 2, parseErrors: 0, error: null, startedAt: "2026-05-16 10:00:00", finishedAt: "2026-05-16 10:00:01" }), { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
-    const upSpy = vi.spyOn(api, "uploadFile").mockResolvedValue("job-7");
+  it("server file: already imported -> shows warning, confirm reprocess sends replace=true", async () => {
+    vi.spyOn(api, "files").mockResolvedValue([{ name: "sample.csv", size: 10, modified: "2026-05-16T00:00:00Z" }]);
+    vi.spyOn(api, "importExists").mockResolvedValue({ exists: true, rows: 686181, lastIngestedAt: "2026-05-16 23:42:32" });
+    const startSpy = vi.spyOn(api, "startImport").mockResolvedValue({ jobId: "job-2" });
+    vi.spyOn(api, "importStatus").mockResolvedValue({ id: "job-2", file: "sample.csv", status: "done", rowsProcessed: 1, rowsInserted: 1, parseErrors: 0, error: null, startedAt: "2026-05-16 10:00:00", finishedAt: "2026-05-16 10:00:01" });
 
     render(<Import />);
-    await waitFor(() => expect(screen.getByLabelText(/arquivo do meu computador/i)).toBeInTheDocument());
-    const input = screen.getByLabelText(/arquivo do meu computador/i) as HTMLInputElement;
-    const file = new File(["a,b\n1,2\n"], "u.csv", { type: "text/csv" });
-    await userEvent.upload(input, file);
-    await userEvent.click(screen.getByRole("button", { name: /enviar/i }));
-    expect(upSpy).toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByText("sample.csv")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: /importar/i }));
+    await waitFor(() => expect(screen.getByText(/já foi importado/i)).toBeInTheDocument());
+    expect(screen.getByText(/686181/)).toBeInTheDocument();
+    expect(startSpy).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: /reprocessar/i }));
+    expect(startSpy).toHaveBeenCalledWith("sample.csv", true);
     await waitFor(() => expect(screen.getByText(/Ingest[aã]o conclu/i)).toBeInTheDocument(), { timeout: 5000 });
   });
 
-  it("upload failure resets to idle and surfaces the error", async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
-    vi.spyOn(api, "uploadFile").mockRejectedValue(new Error("network fail"));
+  it("upload: already imported -> warning, cancel does not upload", async () => {
+    vi.spyOn(api, "files").mockResolvedValue([]);
+    vi.spyOn(api, "importExists").mockResolvedValue({ exists: true, rows: 9, lastIngestedAt: "2026-05-16 00:00:00" });
+    const upSpy = vi.spyOn(api, "uploadFile").mockResolvedValue("job-7");
 
     render(<Import />);
-    await waitFor(() => expect(screen.getByLabelText(/arquivo do meu computador/i)).toBeInTheDocument());
-    const input = screen.getByLabelText(/arquivo do meu computador/i) as HTMLInputElement;
+    const input = await screen.findByLabelText(/arquivo do meu computador/i) as HTMLInputElement;
     await userEvent.upload(input, new File(["a\n"], "u.csv", { type: "text/csv" }));
     await userEvent.click(screen.getByRole("button", { name: /enviar/i }));
-
-    await waitFor(() => expect(screen.getByText(/network fail/i)).toBeInTheDocument());
-    expect(screen.queryByText(/Ingest[aã]o/i)).toBeNull();
+    await waitFor(() => expect(screen.getByText(/já foi importado/i)).toBeInTheDocument());
+    expect(upSpy).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: /cancelar/i }));
+    await waitFor(() => expect(screen.queryByText(/já foi importado/i)).toBeNull());
+    expect(upSpy).not.toHaveBeenCalled();
   });
 });

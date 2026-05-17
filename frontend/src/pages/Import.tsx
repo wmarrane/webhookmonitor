@@ -3,6 +3,10 @@ import { api, type FileInfo, type ImportJob, type UploadProgress } from "../api/
 import { AsyncState } from "../components/AsyncState.js";
 import { ProgressMonitor } from "../components/ProgressMonitor.js";
 
+type Pending =
+  | { kind: "server"; name: string; rows: number; lastIngestedAt: string }
+  | { kind: "upload"; file: File; rows: number; lastIngestedAt: string };
+
 export function Import() {
   const [files, setFiles] = useState<FileInfo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -10,6 +14,7 @@ export function Import() {
   const [phase, setPhase] = useState<"idle" | "upload" | "ingest">("idle");
   const [upload, setUpload] = useState<UploadProgress | null>(null);
   const [picked, setPicked] = useState<File | null>(null);
+  const [pending, setPending] = useState<Pending | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -34,27 +39,63 @@ export function Import() {
     }, 1000);
   };
 
-  const startServerFile = async (file: string) => {
+  const runServer = async (name: string, replace: boolean) => {
     setJob(null); setError(null); setUpload(null);
     try {
-      const { jobId } = await api.startImport(file);
+      const { jobId } = await api.startImport(name, replace);
       poll(jobId);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
   };
 
-  const sendUpload = async () => {
-    if (!picked) return;
-    setJob(null); setError(null); setUpload({ loaded: 0, total: picked.size });
+  const runUpload = async (file: File, replace: boolean) => {
+    setJob(null); setError(null); setUpload({ loaded: 0, total: file.size });
     setPhase("upload");
     try {
-      const jobId = await api.uploadFile(picked, (p) => setUpload(p));
+      const jobId = await api.uploadFile(file, (p) => setUpload(p), replace);
       poll(jobId);
     } catch (e) {
       setPhase("idle");
       setError(e instanceof Error ? e.message : String(e));
     }
+  };
+
+  const onImportServer = async (name: string) => {
+    setError(null);
+    try {
+      const ex = await api.importExists(name);
+      if (ex.exists) {
+        setPending({ kind: "server", name, rows: ex.rows, lastIngestedAt: ex.lastIngestedAt });
+      } else {
+        await runServer(name, false);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const onSendUpload = async () => {
+    if (!picked) return;
+    setError(null);
+    try {
+      const ex = await api.importExists(picked.name);
+      if (ex.exists) {
+        setPending({ kind: "upload", file: picked, rows: ex.rows, lastIngestedAt: ex.lastIngestedAt });
+      } else {
+        await runUpload(picked, false);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const confirmReprocess = async () => {
+    const p = pending;
+    setPending(null);
+    if (!p) return;
+    if (p.kind === "server") await runServer(p.name, true);
+    else await runUpload(p.file, true);
   };
 
   return (
@@ -70,11 +111,35 @@ export function Import() {
         <button
           className="rounded bg-slate-900 px-3 py-1 text-white disabled:opacity-40"
           disabled={!picked || phase !== "idle"}
-          onClick={sendUpload}
+          onClick={onSendUpload}
         >
           Enviar
         </button>
       </section>
+
+      {pending && (
+        <div className="rounded border border-amber-400 bg-amber-50 p-4 text-sm">
+          <p>
+            ⚠️ "<b>{pending.kind === "server" ? pending.name : pending.file.name}</b>" já foi
+            importado em <b>{pending.lastIngestedAt}</b> ({pending.rows} linhas).
+            Reprocessar substituirá esses registros.
+          </p>
+          <div className="mt-2 flex gap-2">
+            <button
+              className="rounded bg-amber-700 px-3 py-1 text-white"
+              onClick={confirmReprocess}
+            >
+              Reprocessar
+            </button>
+            <button
+              className="rounded border px-3 py-1"
+              onClick={() => setPending(null)}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       <AsyncState
         loading={!files && !error}
@@ -94,7 +159,7 @@ export function Import() {
                   <td className="p-2">
                     <button
                       className="rounded bg-slate-900 px-3 py-1 text-white"
-                      onClick={() => startServerFile(f.name)}
+                      onClick={() => onImportServer(f.name)}
                     >
                       Importar
                     </button>
