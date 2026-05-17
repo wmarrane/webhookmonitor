@@ -16,20 +16,25 @@ let dir: string;
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "uploads-")); });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-function fakeRepo() {
+function fakeRepo(stats = { rows: 0, lastIngestedAt: "" }) {
   const inserted: unknown[] = [];
-  return { inserted, deleteByFileName: async () => {}, insertRows: async (r: unknown[]) => { inserted.push(...r); }, fileStats: async () => ({ rows: 0, lastIngestedAt: "" }) };
+  return {
+    inserted,
+    deleteByFileName: async () => {},
+    insertRows: async (r: unknown[]) => { inserted.push(...r); },
+    fileStats: async () => stats,
+  };
 }
 
 const CSV =
   "ID interno,Data,Hora,Nome,Título,Tipo,Tipo de script,Detalhes\n" +
   '3262308,15/05/2026,1:06,[CCC] MSG,nr,Depurar,Evento de usuário,"{""id"":""360738"",""type"":""invoice"",""fields"":{""custbody_nst_integra_id_"":""38967664""}}"\n';
 
-async function build(maxBytes = 0) {
+async function build(maxBytes = 0, stats = { rows: 0, lastIngestedAt: "" }) {
   const app = Fastify();
   await app.register(multipart);
   const jobs = new JobStore();
-  const repo = fakeRepo();
+  const repo = fakeRepo(stats);
   registerUpload(app, {
     cfg: { UPLOAD_DIR: dir, INGEST_BATCH_SIZE: 100, MAX_UPLOAD_BYTES: maxBytes } as never,
     repo: repo as never,
@@ -65,6 +70,7 @@ describe("POST /api/upload", () => {
     expect(job.status).toBe("done");
     expect(repo.inserted.length).toBe(1);
     expect(readdirSync(dir).length).toBe(1);
+    expect((repo.inserted[0] as { source_file: string }).source_file).toBe("dados.csv");
     await app.close();
   });
 
@@ -103,6 +109,43 @@ describe("POST /api/upload", () => {
     expect(names.length).toBe(1);
     expect(names[0].includes("..")).toBe(false);
     expect(names[0].endsWith(".csv")).toBe(true);
+    await app.close();
+  });
+
+  it("409 already_imported when original name exists and no replace; removes temp file", async () => {
+    const { app } = await build(0, { rows: 10, lastIngestedAt: "2026-05-16 00:00:00" });
+    const f = form("dados.csv", CSV);
+    const res = await app.inject({ method: "POST", url: "/api/upload", payload: f, headers: f.getHeaders() });
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toMatchObject({ error: "already_imported", rows: 10 });
+    expect(readdirSync(dir).length).toBe(0);
+    await app.close();
+  });
+
+  it("replace=1 ingests even if original name exists", async () => {
+    const { app, repo } = await build(0, { rows: 10, lastIngestedAt: "2026-05-16 00:00:00" });
+    const f = form("dados.csv", CSV);
+    const res = await app.inject({ method: "POST", url: "/api/upload?replace=1", payload: f, headers: f.getHeaders() });
+    expect(res.statusCode).toBe(202);
+    for (let i = 0; i < 50; i++) { if (repo.inserted.length >= 1) break; await new Promise((x) => setTimeout(x, 20)); }
+    expect((repo.inserted[0] as { source_file: string }).source_file).toBe("dados.csv");
+    await app.close();
+  });
+
+  it("job.file is the original name (not the unique disk name)", async () => {
+    const { app } = await build();
+    const f = form("dados.csv", CSV);
+    const start = await app.inject({ method: "POST", url: "/api/upload", payload: f, headers: f.getHeaders() });
+    const { jobId } = start.json() as { jobId: string };
+    let file = "";
+    for (let i = 0; i < 50; i++) {
+      const r = await app.inject({ method: "GET", url: `/api/import/${jobId}` });
+      const j = r.json() as { status: string; file: string };
+      file = j.file;
+      if (j.status !== "running") break;
+      await new Promise((x) => setTimeout(x, 20));
+    }
+    expect(file).toBe("dados.csv");
     await app.close();
   });
 });

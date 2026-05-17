@@ -20,7 +20,7 @@ export function registerUpload(
   deps: Deps,
   opts: { statusRoute?: boolean } = {},
 ): void {
-  app.post("/api/upload", async (req, reply) => {
+  app.post<{ Querystring: { replace?: string } }>("/api/upload", async (req, reply) => {
     const limits =
       deps.cfg.MAX_UPLOAD_BYTES > 0
         ? { limits: { fileSize: deps.cfg.MAX_UPLOAD_BYTES } }
@@ -52,7 +52,21 @@ export function registerUpload(
       return reply.code(413).send({ error: "too_large", message: "file exceeds MAX_UPLOAD_BYTES" });
     }
 
-    const job = deps.jobs.create(unique);
+    const replace = req.query.replace === "1";
+    if (!replace) {
+      const { rows, lastIngestedAt } = await deps.repo.fileStats(original);
+      if (rows > 0) {
+        await unlink(dest).catch(() => {});
+        return reply.code(409).send({
+          error: "already_imported",
+          message: `file already imported (${rows} rows)`,
+          rows,
+          lastIngestedAt,
+        });
+      }
+    }
+
+    const job = deps.jobs.create(original);
     reply.code(202).send({ jobId: job.id });
 
     startIngestJob({
