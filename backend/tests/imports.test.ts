@@ -36,4 +36,12 @@ describe("GET /api/imports/exists", () => {
     expect(res.statusCode).toBe(400);
     await app.close();
   });
+
+  it("400 when file contains a path separator (traversal)", async () => {
+    const app = Fastify();
+    registerImportsExists(app, { repo: repo({ rows: 0, lastIngestedAt: "" }) as never });
+    const res = await app.inject({ method: "GET", url: "/api/imports/exists?file=..%2F..%2Fx.csv" });
+    expect(res.statusCode).toBe(400);
+    await app.close();
+  });
 });
