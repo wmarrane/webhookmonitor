@@ -12,7 +12,7 @@ interface Deps {
 }
 
 export function registerImport(app: FastifyInstance, deps: Deps): void {
-  app.post<{ Body: { file?: string } }>("/api/import", async (req, reply) => {
+  app.post<{ Body: { file?: string; replace?: boolean } }>("/api/import", async (req, reply) => {
     const requested = req.body?.file ?? "";
     const safe = basename(requested);
     if (
@@ -25,6 +25,19 @@ export function registerImport(app: FastifyInstance, deps: Deps): void {
     const full = join(deps.cfg.CARGAS_DIR, safe);
     if (!existsSync(full)) {
       return reply.code(400).send({ error: "not_found", message: "file not found in cargas" });
+    }
+
+    const replace = req.body?.replace === true;
+    if (!replace) {
+      const { rows, lastIngestedAt } = await deps.repo.fileStats(safe);
+      if (rows > 0) {
+        return reply.code(409).send({
+          error: "already_imported",
+          message: `file already imported (${rows} rows)`,
+          rows,
+          lastIngestedAt,
+        });
+      }
     }
 
     const job = deps.jobs.create(safe);

@@ -7,15 +7,13 @@ import { JobStore } from "../src/ingest/jobStore.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-function fakeRepo() {
+function fakeRepo(stats = { rows: 0, lastIngestedAt: "" }) {
   const inserted: unknown[] = [];
   return {
     inserted,
     deleteByFileName: async () => {},
-    insertRows: async (rows: unknown[]) => {
-      inserted.push(...rows);
-    },
-    fileStats: async () => ({ rows: 0, lastIngestedAt: "" }),
+    insertRows: async (r: unknown[]) => { inserted.push(...r); },
+    fileStats: async () => stats,
   };
 }
 
@@ -65,6 +63,38 @@ describe("import route", () => {
       payload: { file: "../secrets.txt" },
     });
     expect(res.statusCode).toBe(400);
+    await app.close();
+  });
+
+  it("409 already_imported when file exists and no replace", async () => {
+    const app = Fastify();
+    registerImport(app, {
+      cfg: { CARGAS_DIR: join(here, "fixtures"), INGEST_BATCH_SIZE: 2 } as never,
+      repo: fakeRepo({ rows: 686181, lastIngestedAt: "2026-05-16 23:42:32" }) as never,
+      jobs: new JobStore(),
+    });
+    const res = await app.inject({
+      method: "POST", url: "/api/import",
+      payload: { file: "sample.csv" },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toMatchObject({ error: "already_imported", rows: 686181 });
+    await app.close();
+  });
+
+  it("replaces (202) when file exists and replace=true", async () => {
+    const app = Fastify();
+    registerImport(app, {
+      cfg: { CARGAS_DIR: join(here, "fixtures"), INGEST_BATCH_SIZE: 2 } as never,
+      repo: fakeRepo({ rows: 5, lastIngestedAt: "2026-05-16 00:00:00" }) as never,
+      jobs: new JobStore(),
+    });
+    const res = await app.inject({
+      method: "POST", url: "/api/import",
+      payload: { file: "sample.csv", replace: true },
+    });
+    expect(res.statusCode).toBe(202);
+    expect((res.json() as { jobId: string }).jobId).toMatch(/^[0-9a-f-]{36}$/);
     await app.close();
   });
 });
