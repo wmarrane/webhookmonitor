@@ -21,11 +21,15 @@ export function registerUpload(
   opts: { statusRoute?: boolean } = {},
 ): void {
   app.post<{ Querystring: { replace?: string } }>("/api/upload", async (req, reply) => {
-    const limits =
-      deps.cfg.MAX_UPLOAD_BYTES > 0
-        ? { limits: { fileSize: deps.cfg.MAX_UPLOAD_BYTES } }
-        : {};
-    const part = await req.file({ ...limits, throwFileSizeLimit: false });
+    // MAX_UPLOAD_BYTES=0 means "no limit". @fastify/multipart otherwise falls
+    // back to Fastify's bodyLimit (1 MB) as the per-file fileSize cap, which
+    // would silently truncate large uploads — so pass Infinity explicitly.
+    const fileSize =
+      deps.cfg.MAX_UPLOAD_BYTES > 0 ? deps.cfg.MAX_UPLOAD_BYTES : Infinity;
+    const part = await req.file({
+      limits: { fileSize },
+      throwFileSizeLimit: false,
+    });
 
     if (!part || !part.filename) {
       return reply.code(400).send({ error: "bad_request", message: "no file part" });

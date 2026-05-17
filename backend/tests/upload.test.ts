@@ -100,6 +100,29 @@ describe("POST /api/upload", () => {
     await app.close();
   });
 
+  it("MAX_UPLOAD_BYTES=0 accepts a file larger than 1MB (no implicit cap)", async () => {
+    const { app, jobs } = await build(0);
+    const row =
+      '3262308,15/05/2026,1:06,[CCC] MSG,nr,Depurar,Evento de usuário,"{""id"":""360738""}"\n';
+    // ~1.5 MB: well above @fastify/multipart's 1MB default fileSize fallback
+    const big =
+      "ID interno,Data,Hora,Nome,Título,Tipo,Tipo de script,Detalhes\n" +
+      row.repeat(20000);
+    expect(Buffer.byteLength(big)).toBeGreaterThan(1024 * 1024);
+    const f = form("grande.csv", big);
+    const res = await app.inject({ method: "POST", url: "/api/upload", payload: f, headers: f.getHeaders() });
+    expect(res.statusCode).toBe(202);
+    const { jobId } = res.json() as { jobId: string };
+    for (let i = 0; i < 100; i++) {
+      const j = jobs.get(jobId)!;
+      if (j.status !== "running") break;
+      await new Promise((x) => setTimeout(x, 20));
+    }
+    expect(jobs.get(jobId)!.status).toBe("done");
+    expect(readdirSync(dir).length).toBe(1);
+    await app.close();
+  });
+
   it("sanitizes path-traversal filenames (stays inside UPLOAD_DIR)", async () => {
     const { app } = await build();
     const f = form("../../evil.csv", CSV);
