@@ -9,9 +9,11 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 function fakeRepo(stats = { rows: 0, lastIngestedAt: "" }) {
   const inserted: unknown[] = [];
+  const deletedFiles: string[] = [];
   return {
     inserted,
-    deleteByFileName: async () => {},
+    deletedFiles,
+    deleteByFileName: async (f: string) => { deletedFiles.push(f); },
     insertRows: async (r: unknown[]) => { inserted.push(...r); },
     fileStats: async () => stats,
   };
@@ -84,9 +86,10 @@ describe("import route", () => {
 
   it("replaces (202) when file exists and replace=true", async () => {
     const app = Fastify();
+    const repo = fakeRepo({ rows: 5, lastIngestedAt: "2026-05-16 00:00:00" });
     registerImport(app, {
       cfg: { CARGAS_DIR: join(here, "fixtures"), INGEST_BATCH_SIZE: 2 } as never,
-      repo: fakeRepo({ rows: 5, lastIngestedAt: "2026-05-16 00:00:00" }) as never,
+      repo: repo as never,
       jobs: new JobStore(),
     });
     const res = await app.inject({
@@ -94,7 +97,23 @@ describe("import route", () => {
       payload: { file: "sample.csv", replace: true },
     });
     expect(res.statusCode).toBe(202);
-    expect((res.json() as { jobId: string }).jobId).toMatch(/^[0-9a-f-]{36}$/);
+    const { jobId } = res.json() as { jobId: string };
+    expect(jobId).toMatch(/^[0-9a-f-]{36}$/);
+    for (let i = 0; i < 50; i++) { if (repo.inserted.length >= 1) break; await new Promise((x) => setTimeout(x, 20)); }
+    expect(repo.inserted.length).toBeGreaterThan(0);
+    expect(repo.deletedFiles).toContain("sample.csv");
+    await app.close();
+  });
+
+  it("400 not_found when file absent even with replace=true", async () => {
+    const app = Fastify();
+    registerImport(app, {
+      cfg: { CARGAS_DIR: join(here, "fixtures"), INGEST_BATCH_SIZE: 2 } as never,
+      repo: fakeRepo({ rows: 5, lastIngestedAt: "2026-05-16 00:00:00" }) as never,
+      jobs: new JobStore(),
+    });
+    const res = await app.inject({ method: "POST", url: "/api/import", payload: { file: "ghost.csv", replace: true } });
+    expect(res.statusCode).toBe(400);
     await app.close();
   });
 });
