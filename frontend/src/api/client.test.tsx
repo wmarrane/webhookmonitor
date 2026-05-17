@@ -22,6 +22,19 @@ describe("api client", () => {
     await expect(api.files()).rejects.toThrow();
   });
 
+  it("startImport rejects with server message on 409 JSON body", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ error: "already_imported", message: "file already imported (5 rows)" }),
+          { status: 409 },
+        ),
+      ),
+    );
+    await expect(api.startImport("x.csv")).rejects.toThrow("file already imported (5 rows)");
+  });
+
   it("uploadFile posts multipart and resolves jobId, reporting progress", async () => {
     const listeners: Record<string, (e: unknown) => void> = {};
     const xhrMock = {

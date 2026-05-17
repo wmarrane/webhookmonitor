@@ -1,5 +1,15 @@
 const BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 
+async function errMessage(res: Response, path: string): Promise<string> {
+  try {
+    const body = (await res.json()) as { message?: string };
+    if (body && typeof body.message === "string" && body.message) return body.message;
+  } catch {
+    /* non-JSON body */
+  }
+  return `API ${res.status}: ${path}`;
+}
+
 export interface FileInfo { name: string; size: number; modified: string; }
 export interface ImportJob {
   id: string; file: string;
@@ -24,7 +34,7 @@ export interface Stats {
 
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`);
-  if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
+  if (!res.ok) throw new Error(await errMessage(res, path));
   return (await res.json()) as T;
 }
 async function post<T>(path: string, body: unknown): Promise<T> {
@@ -33,7 +43,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
+  if (!res.ok) throw new Error(await errMessage(res, path));
   return (await res.json()) as T;
 }
 
@@ -59,7 +69,14 @@ function uploadFile(
           reject(new Error("invalid upload response"));
         }
       } else {
-        reject(new Error(`API ${xhr.status}: /api/upload`));
+        let msg = `API ${xhr.status}: /api/upload`;
+        try {
+          const b = JSON.parse(xhr.responseText) as { message?: string };
+          if (b && typeof b.message === "string" && b.message) msg = b.message;
+        } catch {
+          /* non-JSON */
+        }
+        reject(new Error(msg));
       }
     });
     xhr.addEventListener("error", () => reject(new Error("upload network error")));
