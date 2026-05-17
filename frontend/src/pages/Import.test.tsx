@@ -30,7 +30,7 @@ describe("Import", () => {
     await waitFor(() => expect(screen.getByText("sample.csv")).toBeInTheDocument());
     await userEvent.click(screen.getByRole("button", { name: /importar/i }));
     await waitFor(() => expect(screen.getByText(/já foi importado/i)).toBeInTheDocument());
-    expect(screen.getByText(/686181/)).toBeInTheDocument();
+    expect(screen.getByTestId("reprocess-warning")).toHaveTextContent("686181");
     expect(startSpy).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: /reprocessar/i }));
     expect(startSpy).toHaveBeenCalledWith("sample.csv", true);

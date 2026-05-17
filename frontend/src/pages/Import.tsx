@@ -119,7 +119,7 @@ export function Import() {
 
       {pending && (
         <div className="rounded border border-amber-400 bg-amber-50 p-4 text-sm">
-          <p>
+          <p data-testid="reprocess-warning">
             ⚠️ "<b>{pending.kind === "server" ? pending.name : pending.file.name}</b>" já foi
             importado em <b>{pending.lastIngestedAt}</b> ({pending.rows} linhas).
             Reprocessar substituirá esses registros.
@@ -129,7 +129,7 @@ export function Import() {
               className="rounded bg-amber-700 px-3 py-1 text-white"
               onClick={confirmReprocess}
             >
-              Reprocessar
+              Reprocessar (substituir {pending.rows} linhas)
             </button>
             <button
               className="rounded border px-3 py-1"
