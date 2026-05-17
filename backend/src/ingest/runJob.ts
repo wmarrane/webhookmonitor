@@ -5,6 +5,7 @@ import type { JobStore } from "./jobStore.js";
 export interface IngestJobRepo {
   deleteByFileName: (file: string) => Promise<void>;
   insertRows: (rows: unknown[]) => Promise<void>;
+  fileStats: (file: string) => Promise<{ rows: number; lastIngestedAt: string }>;
 }
 
 export interface StartIngestJobOptions {

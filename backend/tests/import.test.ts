@@ -15,6 +15,7 @@ function fakeRepo() {
     insertRows: async (rows: unknown[]) => {
       inserted.push(...rows);
     },
+    fileStats: async () => ({ rows: 0, lastIngestedAt: "" }),
   };
 }
 

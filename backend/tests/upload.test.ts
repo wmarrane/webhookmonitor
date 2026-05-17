@@ -18,7 +18,7 @@ afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
 function fakeRepo() {
   const inserted: unknown[] = [];
-  return { inserted, deleteByFileName: async () => {}, insertRows: async (r: unknown[]) => { inserted.push(...r); } };
+  return { inserted, deleteByFileName: async () => {}, insertRows: async (r: unknown[]) => { inserted.push(...r); }, fileStats: async () => ({ rows: 0, lastIngestedAt: "" }) };
 }
 
 const CSV =

@@ -50,6 +50,16 @@ export function buildWhereClause(f: ListFilters): {
   return { sql, params };
 }
 
+export function buildFileStatsQuery(
+  db: string,
+  file: string,
+): { query: string; params: Record<string, unknown> } {
+  return {
+    query: `SELECT count() AS rows, toString(max(ingested_at)) AS lastIngestedAt FROM \`${db}\`.requests WHERE source_file = {file:String}`,
+    params: { file },
+  };
+}
+
 export class RequestsRepo {
   constructor(
     private readonly client: ClickHouseClient,
@@ -163,5 +173,14 @@ export class RequestsRepo {
       values: rows,
       format: "JSONEachRow",
     });
+  }
+
+  async fileStats(file: string): Promise<{ rows: number; lastIngestedAt: string }> {
+    const { query, params } = buildFileStatsQuery(this.db, file);
+    const res = await this.client.query({ query, query_params: params, format: "JSON" });
+    const data = (await res.json()).data as { rows: string; lastIngestedAt: string }[];
+    const first = data[0];
+    const rows = Number(first?.rows ?? 0);
+    return { rows, lastIngestedAt: rows > 0 ? (first?.lastIngestedAt ?? "") : "" };
   }
 }
