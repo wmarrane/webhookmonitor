@@ -158,7 +158,8 @@ export function Import() {
                   <td className="p-2">{(f.size / 1_048_576).toFixed(1)} MB</td>
                   <td className="p-2">
                     <button
-                      className="rounded bg-slate-900 px-3 py-1 text-white"
+                      className="rounded bg-slate-900 px-3 py-1 text-white disabled:opacity-40"
+                      disabled={phase !== "idle"}
                       onClick={() => onImportServer(f.name)}
                     >
                       Importar

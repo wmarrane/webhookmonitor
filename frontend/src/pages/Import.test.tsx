@@ -52,4 +52,18 @@ describe("Import", () => {
     await waitFor(() => expect(screen.queryByText(/já foi importado/i)).toBeNull());
     expect(upSpy).not.toHaveBeenCalled();
   });
+
+  it("server file: already imported -> cancel does not import and clears warning", async () => {
+    vi.spyOn(api, "files").mockResolvedValue([{ name: "sample.csv", size: 10, modified: "2026-05-16T00:00:00Z" }]);
+    vi.spyOn(api, "importExists").mockResolvedValue({ exists: true, rows: 42, lastIngestedAt: "2026-05-16 00:00:00" });
+    const startSpy = vi.spyOn(api, "startImport").mockResolvedValue({ jobId: "job-x" });
+
+    render(<Import />);
+    await waitFor(() => expect(screen.getByText("sample.csv")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: /importar/i }));
+    await waitFor(() => expect(screen.getByText(/já foi importado/i)).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: /cancelar/i }));
+    await waitFor(() => expect(screen.queryByText(/já foi importado/i)).toBeNull());
+    expect(startSpy).not.toHaveBeenCalled();
+  });
 });
