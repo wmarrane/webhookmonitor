@@ -14,6 +14,42 @@ export interface ListFilters {
 const SUMMARY_COLS =
   "id_interno, event_ts, nome, titulo, tipo, tipo_script, txn_id, txn_type, integra_id, status";
 
+export function buildWhereClause(f: ListFilters): {
+  sql: string;
+  params: Record<string, unknown>;
+} {
+  const clauses: string[] = [];
+  const params: Record<string, unknown> = {};
+  if (f.from) {
+    clauses.push("event_ts >= {from:DateTime}");
+    params.from = `${f.from} 00:00:00`;
+  }
+  if (f.to) {
+    clauses.push("event_ts <= {to:DateTime}");
+    params.to = `${f.to} 23:59:59`;
+  }
+  if (f.tipo) {
+    clauses.push("tipo = {tipo:String}");
+    params.tipo = f.tipo;
+  }
+  if (f.titulo) {
+    clauses.push("titulo = {titulo:String}");
+    params.titulo = f.titulo;
+  }
+  if (f.status) {
+    clauses.push("status = {status:String}");
+    params.status = f.status;
+  }
+  if (f.q) {
+    clauses.push(
+      "(txn_id = {q:String} OR integra_id = {q:String} OR (toUInt64OrZero({q:String}) > 0 AND id_interno = toUInt64OrZero({q:String})) OR positionCaseInsensitive(detalhes, {q:String}) > 0)",
+    );
+    params.q = f.q;
+  }
+  const sql = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+  return { sql, params };
+}
+
 export class RequestsRepo {
   constructor(
     private readonly client: ClickHouseClient,
@@ -24,36 +60,7 @@ export class RequestsRepo {
     sql: string;
     params: Record<string, unknown>;
   } {
-    const clauses: string[] = [];
-    const params: Record<string, unknown> = {};
-    if (f.from) {
-      clauses.push("event_ts >= {from:DateTime}");
-      params.from = `${f.from} 00:00:00`;
-    }
-    if (f.to) {
-      clauses.push("event_ts <= {to:DateTime}");
-      params.to = `${f.to} 23:59:59`;
-    }
-    if (f.tipo) {
-      clauses.push("tipo = {tipo:String}");
-      params.tipo = f.tipo;
-    }
-    if (f.titulo) {
-      clauses.push("titulo = {titulo:String}");
-      params.titulo = f.titulo;
-    }
-    if (f.status) {
-      clauses.push("status = {status:String}");
-      params.status = f.status;
-    }
-    if (f.q) {
-      clauses.push(
-        "(txn_id = {q:String} OR integra_id = {q:String} OR positionCaseInsensitive(detalhes, {q:String}) > 0)",
-      );
-      params.q = f.q;
-    }
-    const sql = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
-    return { sql, params };
+    return buildWhereClause(f);
   }
 
   async list(f: ListFilters): Promise<{
