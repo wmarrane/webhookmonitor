@@ -38,14 +38,16 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 }
 
 export interface UploadProgress { loaded: number; total: number; }
+export interface ImportExists { exists: boolean; rows: number; lastIngestedAt: string; }
 
 function uploadFile(
   file: File,
   onProgress?: (p: UploadProgress) => void,
+  replace = false,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${BASE}/api/upload`);
+    xhr.open("POST", `${BASE}/api/upload${replace ? "?replace=1" : ""}`);
     xhr.upload.addEventListener("progress", (e: ProgressEvent) => {
       if (e.lengthComputable && onProgress) onProgress({ loaded: e.loaded, total: e.total });
     });
@@ -70,7 +72,10 @@ function uploadFile(
 export const api = {
   health: () => get<{ status: string; clickhouse: boolean }>("/api/health"),
   files: () => get<FileInfo[]>("/api/files"),
-  startImport: (file: string) => post<{ jobId: string }>("/api/import", { file }),
+  startImport: (file: string, replace = false) =>
+    post<{ jobId: string }>("/api/import", { file, replace }),
+  importExists: (file: string) =>
+    get<ImportExists>(`/api/imports/exists?file=${encodeURIComponent(file)}`),
   importStatus: (id: string) => get<ImportJob>(`/api/import/${id}`),
   stats: (qs = "") => get<Stats>(`/api/stats${qs}`),
   requests: (qs = "") => get<ListResult>(`/api/requests${qs}`),
