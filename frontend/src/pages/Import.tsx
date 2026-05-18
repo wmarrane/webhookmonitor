@@ -198,7 +198,7 @@ export function Import() {
           empty={!!imported && imported.length === 0}
         >
           {imported && (
-            <table className="w-full text-sm">
+            <table className="w-full bg-white text-sm shadow">
               <thead className="bg-slate-100 text-left">
                 <tr>
                   <th className="p-2">Arquivo</th>

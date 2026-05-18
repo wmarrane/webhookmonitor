@@ -81,7 +81,7 @@ describe("Import", () => {
       expect(screen.getByText("Consultaderequestsresultados635.csv")).toBeInTheDocument(),
     );
     expect(screen.getByText("2026-05-17 02:51:52")).toBeInTheDocument();
-    expect(screen.getByText(/Conclu[ií]do/)).toBeInTheDocument();
+    expect(screen.getByText("Concluído")).toBeInTheDocument();
   });
 
   it('imported panel shows "Importando…" while a matching job runs', async () => {
@@ -96,5 +96,36 @@ describe("Import", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /importar/i })).toBeInTheDocument());
     await userEvent.click(screen.getByRole("button", { name: /importar/i }));
     await waitFor(() => expect(screen.getByText(/Importando/)).toBeInTheDocument(), { timeout: 5000 });
+  });
+
+  it('imported panel shows "Falhou" when the matching job failed', async () => {
+    vi.spyOn(api, "files").mockResolvedValue([{ name: "y.csv", size: 10, modified: "2026-05-16T00:00:00Z" }]);
+    vi.spyOn(api, "imports").mockResolvedValue({
+      files: [{ file: "y.csv", rows: 0, lastIngestedAt: "2026-05-16 00:00:00" }],
+    });
+    vi.spyOn(api, "importExists").mockResolvedValue({ exists: false, rows: 0, lastIngestedAt: "" });
+    vi.spyOn(api, "startImport").mockResolvedValue({ jobId: "job-f" });
+    vi.spyOn(api, "importStatus").mockResolvedValue({ id: "job-f", file: "y.csv", status: "failed", rowsProcessed: 0, rowsInserted: 0, parseErrors: 0, error: "boom", startedAt: "2026-05-16 10:00:00", finishedAt: "2026-05-16 10:00:01" });
+    render(<Import />);
+    await waitFor(() => expect(screen.getByRole("button", { name: /importar/i })).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: /importar/i }));
+    await waitFor(() => expect(screen.getByText("Falhou")).toBeInTheDocument(), { timeout: 5000 });
+  });
+
+  it("reloads the imported list after a job finishes", async () => {
+    vi.spyOn(api, "files").mockResolvedValue([{ name: "z.csv", size: 10, modified: "2026-05-16T00:00:00Z" }]);
+    const importsSpy = vi
+      .spyOn(api, "imports")
+      .mockResolvedValueOnce({ files: [] })
+      .mockResolvedValue({ files: [{ file: "z.csv", rows: 7, lastIngestedAt: "2026-05-16 11:00:00" }] });
+    vi.spyOn(api, "importExists").mockResolvedValue({ exists: false, rows: 0, lastIngestedAt: "" });
+    vi.spyOn(api, "startImport").mockResolvedValue({ jobId: "job-z" });
+    vi.spyOn(api, "importStatus").mockResolvedValue({ id: "job-z", file: "z.csv", status: "done", rowsProcessed: 7, rowsInserted: 7, parseErrors: 0, error: null, startedAt: "2026-05-16 10:00:00", finishedAt: "2026-05-16 10:00:01" });
+    render(<Import />);
+    await waitFor(() => expect(screen.getByRole("button", { name: /importar/i })).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: /importar/i }));
+    // "2026-05-16 11:00:00" is the lastIngestedAt for z.csv — only appears in the imported-files panel after reload
+    await waitFor(() => expect(screen.getByText("2026-05-16 11:00:00")).toBeInTheDocument(), { timeout: 5000 });
+    expect(importsSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 });
