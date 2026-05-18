@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import Fastify from "fastify";
-import { registerImportsExists } from "../src/routes/imports.js";
+import { registerImportsExists, registerImportsList } from "../src/routes/imports.js";
 
 function repo(stats: { rows: number; lastIngestedAt: string }) {
   return {
@@ -42,6 +42,30 @@ describe("GET /api/imports/exists", () => {
     registerImportsExists(app, { repo: repo({ rows: 0, lastIngestedAt: "" }) as never });
     const res = await app.inject({ method: "GET", url: "/api/imports/exists?file=..%2F..%2Fx.csv" });
     expect(res.statusCode).toBe(400);
+    await app.close();
+  });
+});
+
+describe("GET /api/imports", () => {
+  it("returns the list of imported files", async () => {
+    const app = Fastify();
+    const files = [
+      { file: "Consultaderequestsresultados635.csv", rows: 686181, lastIngestedAt: "2026-05-17 02:51:52" },
+      { file: "dados.csv", rows: 10, lastIngestedAt: "2026-05-16 00:00:00" },
+    ];
+    registerImportsList(app, { repo: { listImported: async () => files } as never });
+    const res = await app.inject({ method: "GET", url: "/api/imports" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ files });
+    await app.close();
+  });
+
+  it("returns an empty list when nothing was imported", async () => {
+    const app = Fastify();
+    registerImportsList(app, { repo: { listImported: async () => [] } as never });
+    const res = await app.inject({ method: "GET", url: "/api/imports" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ files: [] });
     await app.close();
   });
 });

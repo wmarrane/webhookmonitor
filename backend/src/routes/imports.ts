@@ -22,3 +22,14 @@ export function registerImportsExists(app: FastifyInstance, deps: Deps): void {
     },
   );
 }
+
+interface ListDeps {
+  repo: { listImported: () => Promise<{ file: string; rows: number; lastIngestedAt: string }[]> };
+}
+
+export function registerImportsList(app: FastifyInstance, deps: ListDeps): void {
+  app.get("/api/imports", async () => {
+    const files = await deps.repo.listImported();
+    return { files };
+  });
+}

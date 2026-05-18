@@ -192,4 +192,15 @@ export class RequestsRepo {
     const rows = Number(first?.rows ?? 0);
     return { rows, lastIngestedAt: rows > 0 ? (first?.lastIngestedAt ?? "") : "" };
   }
+
+  async listImported(): Promise<{ file: string; rows: number; lastIngestedAt: string }[]> {
+    const { query, params } = buildImportsListQuery(this.db);
+    const res = await this.client.query({ query, query_params: params, format: "JSON" });
+    const data = (await res.json()).data as { file: string; rows: string; lastIngestedAt: string }[];
+    return data.map((r) => ({
+      file: r.file,
+      rows: Number(r.rows ?? 0),
+      lastIngestedAt: r.lastIngestedAt ?? "",
+    }));
+  }
 }
