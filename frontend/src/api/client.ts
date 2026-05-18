@@ -49,6 +49,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 
 export interface UploadProgress { loaded: number; total: number; }
 export interface ImportExists { exists: boolean; rows: number; lastIngestedAt: string; }
+export interface ImportedFile { file: string; rows: number; lastIngestedAt: string; }
 
 function uploadFile(
   file: File,
@@ -93,6 +94,7 @@ export const api = {
     post<{ jobId: string }>("/api/import", { file, replace }),
   importExists: (file: string) =>
     get<ImportExists>(`/api/imports/exists?file=${encodeURIComponent(file)}`),
+  imports: () => get<{ files: ImportedFile[] }>("/api/imports"),
   importStatus: (id: string) => get<ImportJob>(`/api/import/${id}`),
   stats: (qs = "") => get<Stats>(`/api/stats${qs}`),
   requests: (qs = "") => get<ListResult>(`/api/requests${qs}`),

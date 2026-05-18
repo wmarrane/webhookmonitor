@@ -35,6 +35,17 @@ describe("api client", () => {
     await expect(api.startImport("x.csv")).rejects.toThrow("file already imported (5 rows)");
   });
 
+  it("imports() GETs /api/imports and parses { files }", async () => {
+    const files = [{ file: "a.csv", rows: 5, lastIngestedAt: "2026-05-16 00:00:00" }];
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ files }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const res = await api.imports();
+    expect(res).toEqual({ files });
+    expect(fetchMock.mock.calls[0][0]).toContain("/api/imports");
+  });
+
   it("uploadFile posts multipart and resolves jobId, reporting progress", async () => {
     const listeners: Record<string, (e: unknown) => void> = {};
     const xhrMock = {
