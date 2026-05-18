@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api, type FileInfo, type ImportJob, type UploadProgress } from "../api/client.js";
+import { api, type FileInfo, type ImportJob, type ImportedFile, type UploadProgress } from "../api/client.js";
 import { AsyncState } from "../components/AsyncState.js";
 import { ProgressMonitor } from "../components/ProgressMonitor.js";
 
@@ -15,10 +15,19 @@ export function Import() {
   const [upload, setUpload] = useState<UploadProgress | null>(null);
   const [picked, setPicked] = useState<File | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
+  const [imported, setImported] = useState<ImportedFile[] | null>(null);
+  const [importedError, setImportedError] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const loadImported = () =>
+    api
+      .imports()
+      .then((r) => { setImported(r.files); setImportedError(null); })
+      .catch((e: Error) => setImportedError(e.message));
 
   useEffect(() => {
     api.files().then(setFiles).catch((e: Error) => setError(e.message));
+    loadImported();
     return () => { if (timer.current) clearInterval(timer.current); };
   }, []);
 
@@ -31,6 +40,7 @@ export function Import() {
         setJob(j);
         if (j.status !== "running" && timer.current) {
           clearInterval(timer.current); timer.current = null;
+          loadImported();
         }
       } catch (e) {
         if (timer.current) { clearInterval(timer.current); timer.current = null; }
@@ -96,6 +106,14 @@ export function Import() {
     if (!p) return;
     if (p.kind === "server") await runServer(p.name, true);
     else await runUpload(p.file, true);
+  };
+
+  const statusOf = (file: string): { label: string; cls: string } => {
+    if (job?.file === file && job.status === "running")
+      return { label: "Importando…", cls: "text-amber-700" };
+    if (job?.file === file && job.status === "failed")
+      return { label: "Falhou", cls: "text-red-700" };
+    return { label: "Concluído", cls: "text-green-700" };
   };
 
   return (
@@ -171,6 +189,41 @@ export function Import() {
           </table>
         )}
       </AsyncState>
+
+      <section className="rounded bg-white p-4 shadow space-y-2">
+        <h2 className="font-semibold">Arquivos importados</h2>
+        <AsyncState
+          loading={!imported && !importedError}
+          error={importedError}
+          empty={!!imported && imported.length === 0}
+        >
+          {imported && (
+            <table className="w-full text-sm">
+              <thead className="bg-slate-100 text-left">
+                <tr>
+                  <th className="p-2">Arquivo</th>
+                  <th className="p-2">Linhas</th>
+                  <th className="p-2">Última ingestão</th>
+                  <th className="p-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {imported.map((it) => {
+                  const s = statusOf(it.file);
+                  return (
+                    <tr key={it.file} className="border-b">
+                      <td className="p-2">{it.file}</td>
+                      <td className="p-2">{it.rows.toLocaleString("pt-BR")}</td>
+                      <td className="p-2">{it.lastIngestedAt}</td>
+                      <td className={`p-2 font-medium ${s.cls}`}>{s.label}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </AsyncState>
+      </section>
 
       {phase !== "idle" && (
         <ProgressMonitor
