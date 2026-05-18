@@ -60,6 +60,15 @@ export function buildFileStatsQuery(
   };
 }
 
+export function buildImportsListQuery(
+  db: string,
+): { query: string; params: Record<string, unknown> } {
+  return {
+    query: `SELECT source_file AS file, count() AS rows, toString(max(ingested_at)) AS lastIngestedAt FROM \`${db}\`.requests GROUP BY source_file ORDER BY lastIngestedAt DESC`,
+    params: {},
+  };
+}
+
 export class RequestsRepo {
   constructor(
     private readonly client: ClickHouseClient,
